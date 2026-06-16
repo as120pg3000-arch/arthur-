@@ -1,240 +1,589 @@
 import asyncio
-from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# ---------- بيانات الأزرار الـ 100 ----------
-BUTTONS = {
-    # القسم 1: معلومات عامة (1-10)
-    1:  {"text": "🌤️ الطقس",      "info": "🌤️ *الطقس*\nيمكنك معرفة الطقس عبر موقع: weather.com"},
-    2:  {"text": "⏰ الوقت",       "info": f"⏰ *الوقت الحالي*\nالوقت الآن: {datetime.now().strftime('%I:%M %p')}"},
-    3:  {"text": "📅 التاريخ",     "info": f"📅 *التاريخ*\nاليوم: {datetime.now().strftime('%A, %d %B %Y')}"},
-    4:  {"text": "🌍 معلومات",    "info": "🌍 *معلومات عامة*\nالبوت يقدم 100 معلومة متنوعة ومنظمة في أقسام."},
-    5:  {"text": "💡 هل تعلم",    "info": "💡 *هل تعلم*\nأن أول موقع إلكتروني في العالم أُطلق عام 1991؟"},
-    6:  {"text": "📰 آخر الأخبار","info": "📰 *الأخبار*\nلمعرفة آخر الأخبار، زر موقع: bbc.com/arabic"},
-    7:  {"text": "📊 إحصائيات",  "info": "📊 *إحصائيات*\nعدد سكان العالم حالياً يتجاوز 8 مليارات نسمة."},
-    8:  {"text": "💱 العملات",    "info": "💱 *أسعار العملات*\nيمكن متابعة الأسعار من: xe.com"},
-    9:  {"text": "🎬 أفلام اليوم","info": "🎬 *أفلام اليوم*\nلائحة الأفلام متوفرة على: imdb.com"},
-    10: {"text": "📚 كتب مقترحة", "info": "📚 *كتب مقترحة*\n- 'العادات السبع' لستيفن كوفي"},
-    
-    # القسم 2: صحة وغذاء (11-20)
-    11: {"text": "🥗 تغذية صحية", "info": "🥗 *تغذية صحية*\nتناول 5 حصص من الفواكه والخضار يومياً."},
-    12: {"text": "💪 رياضة",      "info": "💪 *رياضة*\n30 دقيقة مشي يومياً تحسن صحة القلب."},
-    13: {"text": "💧 شرب الماء", "info": "💧 *شرب الماء*\nيُنصح بشرب 8 أكواب ماء يومياً."},
-    14: {"text": "😴 نوم صحي",   "info": "😴 *نوم صحي*\n7-8 ساعات نوم مثالية للبالغين."},
-    15: {"text": "🧘 تأمل",       "info": "🧘 *تأمل*\n10 دقائق تأمل يومياً تقلل التوتر."},
-    16: {"text": "❤️ صحة القلب", "info": "❤️ *صحة القلب*\nفحص دوري للكوليسترول كل 6 أشهر."},
-    17: {"text": "🍎 فيتامينات", "info": "🍎 *فيتامينات*\nفيتامين D مهم جداً، احصل عليه من الشمس."},
-    18: {"text": "🦷 أسنان",      "info": "🦷 *صحة الأسنان*\nغيّر فرشاة أسنانك كل 3 أشهر."},
-    19: {"text": "🌿 أعشاب",      "info": "🌿 *أعشاب طبيعية*\nالبابونج يساعد على الاسترخاء."},
-    20: {"text": "⚠️ تحذير صحي", "info": "⚠️ *تحذير*\nاستشر الطبيب قبل أي حمية."},
+# ============ توكن البوت ============
+BOT_TOKEN = "8635193672:AAE3DJlsOuTPJhviBugWdrJ1vTVO7l_kF6U"
 
-    # القسم 3: تقنيات وبرمجة (21-30)
-    21: {"text": "💻 برمجة",      "info": "💻 *البرمجة*\nPython من أسهل لغات البرمجة للبدء."},
-    22: {"text": "🤖 ذكاء اصطناعي","info": "🤖 *الذكاء الاصطناعي*\nGPT نموذج لغوي ضخم من OpenAI."},
-    23: {"text": "📱 تطبيقات",    "info": "📱 *تطبيقات مفيدة*\nNotion لتنظيم المهام، وTrello لإدارة المشاريع."},
-    24: {"text": "🔒 أمن سيبراني","info": "🔒 *أمن سيبراني*\nاستخدم كلمة مرور قوية وفعّل التحقق الثنائي."},
-    25: {"text": "🛒 تسوق إلكتروني","info": "🛒 *تسوق إلكتروني*\nتأكد من موثوقية المتاجر قبل الشراء."},
-    
-    # --- أكمل من 26 إلى 100 بنفس النمط ---
-    # سأضع بعض الأمثلة الإضافية لتكمل عليها:
-    26: {"text": "📡 إنترنت الأشياء", "info": "📡 *IoT*\nالأجهزة الذكية تتواصل عبر الإنترنت."},
-    27: {"text": "☁️ حوسبة سحابية", "info": "☁️ *Cloud*\nAWS وGoogle Cloud أشهر المنصات."},
-    28: {"text": "🎮 ألعاب", "info": "🎮 *ألعاب فيديو*\nصناعة الألعاب تتجاوز قيمتها 200 مليار دولار."},
-    29: {"text": "🔌 إلكترونيات", "info": "🔌 *إلكترونيات*\nالمقاومات والمكثفات أساس الدوائر."},
-    30: {"text": "📸 تصوير", "info": "📸 *تصوير فوتوغرافي*\nقاعدة الأثلاث سر الصورة الجميلة."},
-
-    # القسم 4: ثقافة وفنون (31-40)
-    31: {"text": "🎨 فن", "info": "🎨 *فن*\nالموناليزا رسمها دافنشي في القرن 16."},
-    32: {"text": "🎵 موسيقى", "info": "🎵 *موسيقى*\nالاستماع للموسيقى الكلاسيكية يحسن التركيز."},
-    33: {"text": "📖 أدب", "info": "📖 *أدب عربي*\n'ألف ليلة وليلة' من روائع الأدب."},
-    34: {"text": "🏛️ تاريخ", "info": "🏛️ *تاريخ*\nالحضارة الفرعونية امتدت 3000 سنة."},
-    35: {"text": "🎭 مسرح", "info": "🎭 *مسرح*\nويليام شكسبير كتب 37 مسرحية."},
-    36: {"text": "🗿 آثار", "info": "🗿 *آثار*\nالبتراء في الأردن من عجائب الدنيا."},
-    37: {"text": "🗣️ لغات", "info": "🗣️ *لغات العالم*\nيوجد أكثر من 7000 لغة في العالم."},
-    38: {"text": "🧬 علوم", "info": "🧬 *علوم*\nالحمض النووي DNA يحمل الشيفرة الوراثية."},
-    39: {"text": "🔭 فضاء", "info": "🔭 *فضاء*\nالسنة الضوئية = 9.46 تريليون كيلومتر."},
-    40: {"text": "🌊 محيطات", "info": "🌊 *محيطات*\n70% من سطح الأرض مغطى بالمياه."},
-
-    # القسم 5: نصائح حياتية (41-50)
-    41: {"text": "⏳ إدارة وقت", "info": "⏳ *إدارة الوقت*\nتقنية بومودورو: 25 دقيقة عمل + 5 دقائق راحة."},
-    42: {"text": "💰 توفير", "info": "💰 *توفير المال*\nادخر 20% من دخلك شهرياً."},
-    43: {"text": "🎯 تحديد أهداف", "info": "🎯 *أهداف*\nاستخدم طريقة SMART لتحديد أهدافك."},
-    44: {"text": "🧹 ترتيب", "info": "🧹 *ترتيب*\nرتب غرفتك يومياً لتصفية ذهنك."},
-    45: {"text": "📝 تدوين", "info": "📝 *تدوين يوميات*\nكتابة 3 إنجازات يومياً ترفع معنوياتك."},
-    46: {"text": "🗣️ تواصل", "info": "🗣️ *مهارات التواصل*\nالاستماع الجيد نصف الحديث."},
-    47: {"text": "🌱 تطوير ذات", "info": "🌱 *تطوير الذات*\nاقرأ 10 صفحات يومياً من كتاب مفيد."},
-    48: {"text": "🛑 عادات سيئة", "info": "🛑 *عادات سيئة*\nحدد عادة تريد التخلص منها واستبدلها."},
-    49: {"text": "🙏 امتنان", "info": "🙏 *الامتنان*\nاكتب 3 أشياء تشعر بالامتنان لها يومياً."},
-    50: {"text": "🔋 طاقة", "info": "🔋 *طاقة إيجابية*\nابتسم، الابتسامة تفرز هرمونات السعادة."},
-
-    # القسم 6: سفر وسياحة (51-60)
-    51: {"text": "✈️ سفر", "info": "✈️ *سفر*\nأفضل وقت لحجز الطيران: قبل 6 أسابيع."},
-    52: {"text": "🏝️ جزر", "info": "🏝️ *جزر رائعة*\nالمالديف وجهة أحلام المسافرين."},
-    53: {"text": "🏔️ جبال", "info": "🏔️ *جبال*\nإفرست أعلى قمة في العالم (8848م)."},
-    54: {"text": "🕌 سياحة دينية", "info": "🕌 *سياحة دينية*\nمكة المكرمة قبلة المسلمين."},
-    55: {"text": "🎒 حقائب", "info": "🎒 *تجهيز الحقيبة*\nلفّ الملابس لتوفير مساحة."},
-    56: {"text": "🛂 جوازات", "info": "🛂 *جواز السفر*\nتأكد من صلاحية جوازك قبل 6 أشهر من السفر."},
-    57: {"text": "🏨 فنادق", "info": "🏨 *حجز فنادق*\nقارن الأسعار على Booking وAgoda."},
-    58: {"text": "🗺️ خرائط", "info": "🗺️ *خرائط*\nحمّل خرائط أوفلاين من Google Maps."},
-    59: {"text": "💳 دفع", "info": "💳 *بطاقات السفر*\nاستخدم بطاقة سفر لتجنب رسوم الصرف."},
-    60: {"text": "🧳 أمتعة", "info": "🧳 *وزن الأمتعة*\nلا تتجاوز 23 كغ في الأمتعة المسجلة."},
-
-    # القسم 7: طبخ ومأكولات (61-70)
-    61: {"text": "🍳 طبخ", "info": "🍳 *طبخ*\nتسخين المقلاة قبل إضافة الزيت يمنع الالتصاق."},
-    62: {"text": "🍕 إيطالي", "info": "🍕 *مطبخ إيطالي*\nالبيتزا الأصلية من نابولي."},
-    63: {"text": "🍣 ياباني", "info": "🍣 *مطبخ ياباني*\nالسوشي يعتمد على الأرز المخلل."},
-    64: {"text": "🍔 وجبات سريعة", "info": "🍔 *وجبات سريعة*\nقلل منها لصحتك."},
-    65: {"text": "🥐 حلويات", "info": "🥐 *حلويات*\nالكنافة النابلسية من ألذ الحلويات العربية."},
-    66: {"text": "☕ قهوة", "info": "☕ *قهوة*\nالقهوة العربية رمز الكرم."},
-    67: {"text": "🍞 خبز", "info": "🍞 *خبز*\nالخبز الأسمر غني بالألياف."},
-    68: {"text": "🥛 ألبان", "info": "🥛 *ألبان*\nالحليب مصدر مهم للكالسيوم."},
-    69: {"text": "🧂 بهارات", "info": "🧂 *بهارات*\nالكمون يساعد على الهضم."},
-    70: {"text": "🥚 بيض", "info": "🥚 *بيض*\nالبيض مصدر ممتاز للبروتين."},
-
-    # القسم 8: رياضة (71-80)
-    71: {"text": "⚽ كرة قدم", "info": "⚽ *كرة القدم*\nكأس العالم كل 4 سنوات."},
-    72: {"text": "🏀 كرة سلة", "info": "🏀 *كرة السلة*\nNBA أقوى دوري في العالم."},
-    73: {"text": "🏊 سباحة", "info": "🏊 *سباحة*\nالسباحة تحرك كل عضلات الجسم."},
-    74: {"text": "🚴 دراجة", "info": "🚴 *ركوب الدراجة*\nمفيد للقلب وصديق للبيئة."},
-    75: {"text": "🏋️ كمال أجسام", "info": "🏋️ *كمال أجسام*\nالراحة بين التمارين ضرورية."},
-    76: {"text": "🧘‍♀️ يوغا", "info": "🧘‍♀️ *يوغا*\nتحسن المرونة والتنفس."},
-    77: {"text": "🏃 جري", "info": "🏃 *جري*\nابدأ بـ10 دقائق يومياً."},
-    78: {"text": "🥋 فنون قتالية", "info": "🥋 *فنون قتالية*\nالكاراتيه من أوكيناوا."},
-    79: {"text": "🎱 بلياردو", "info": "🎱 *بلياردو*\nلعبة تركيز ودقة."},
-    80: {"text": "🏸 ريشة", "info": "🏸 *ريشة طائرة*\nأسرع رياضة بالمضرب."},
-
-    # القسم 9: علوم وطبيعة (81-90)
-    81: {"text": "🦁 حيوانات", "info": "🦁 *حيوانات*\nالفهد أسرع حيوان بري."},
-    82: {"text": "🌵 نباتات", "info": "🌵 *نباتات*\nالصبار يخزن الماء لسنوات."},
-    83: {"text": "🌋 براكين", "info": "🌋 *براكين*\nأكبر بركان نشط: مونا لوا في هاواي."},
-    84: {"text": "🌈 أقواس قزح", "info": "🌈 *قوس قزح*\nيتكون من 7 ألوان."},
-    85: {"text": "🪐 كواكب", "info": "🪐 *كواكب*\nالمشتري أكبر كواكب المجموعة الشمسية."},
-    86: {"text": "🌕 قمر", "info": "🌕 *القمر*\nيبعد عن الأرض 384,400 كم."},
-    87: {"text": "⚡ كهرباء", "info": "⚡ *كهرباء*\nسرعة الضوء 300 ألف كم/ثانية."},
-    88: {"text": "🧲 مغناطيس", "info": "🧲 *مغناطيس*\nالأرض مغناطيس ضخم."},
-    89: {"text": "🦠 بكتيريا", "info": "🦠 *بكتيريا*\nبعضها مفيد للهضم."},
-    90: {"text": "🧪 كيمياء", "info": "🧪 *كيمياء*\nالماء H2O مركب كيميائي."},
-
-    # القسم 10: متفرقات (91-100)
-    91: {"text": "😴 أحلام", "info": "😴 *أحلام*\nنحلم حوالي ساعتين كل ليلة."},
-    92: {"text": "🧠 عقل", "info": "🧠 *العقل البشري*\nيستهلك 20% من طاقة الجسم."},
-    93: {"text": "👁️ عيون", "info": "👁️ *عيون*\nترمش 15-20 مرة في الدقيقة."},
-    94: {"text": "👂 أذن", "info": "👂 *أذن*\nتستمر في النمو طوال العمر."},
-    95: {"text": "💇 شعر", "info": "💇 *شعر*\nينمو 1.25 سم شهرياً."},
-    96: {"text": "🦴 عظام", "info": "🦴 *عظام*\nعند الولادة 300 عظمة، تنقص لـ206."},
-    97: {"text": "❤️ قلب", "info": "❤️ *قلب*\nينبض 100 ألف مرة يومياً."},
-    98: {"text": "🎂 عيد ميلاد", "info": "🎂 *عيد ميلاد*\nأغنية Happy Birthday الأشهر عالمياً."},
-    99: {"text": "🎉 مرح", "info": "🎉 *معلومة مرحة*\nالضحك يحرق سعرات حرارية."},
-    100:{"text": "🏁 النهاية", "info": "🏁 *مبروك!*\nوصلت لآخر زر، أتمنى أنك استفدت! 🤍"},
-}
-
-# إعدادات الصفحات
-BUTTONS_PER_PAGE = 20
-TOTAL_PAGES = 5  # 100 زر ÷ 20 = 5 صفحات
-
-def build_main_menu(page: int = 0) -> InlineKeyboardMarkup:
-    """بناء قائمة رئيسية بـ 20 زراً في الصفحة"""
-    keyboard = []
-    start = page * BUTTONS_PER_PAGE + 1
-    end = start + BUTTONS_PER_PAGE
-    
-    for i in range(start, min(end, 101)):
-        btn_data = BUTTONS[i]
-        # صف واحد لكل زر
-        keyboard.append([InlineKeyboardButton(btn_data["text"], callback_data=f"info_{i}")])
-    
-    # أزرار التنقل بين الصفحات
-    nav_buttons = []
-    if page > 0:
-        nav_buttons.append(InlineKeyboardButton("⬅️ السابق", callback_data=f"page_{page-1}"))
-    nav_buttons.append(InlineKeyboardButton(f"📄 {page+1}/{TOTAL_PAGES}", callback_data="ignore"))
-    if page < TOTAL_PAGES - 1:
-        nav_buttons.append(InlineKeyboardButton("التالي ➡️", callback_data=f"page_{page+1}"))
-    
-    keyboard.append(nav_buttons)
-    
-    # زر العودة للصفحة الرئيسية
-    keyboard.append([InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="page_0")])
-    
-    return InlineKeyboardMarkup(keyboard)
-
+# ============ دالة بدء التشغيل ============
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """رسالة الترحيب مع القائمة الرئيسية"""
-    welcome_msg = (
-        "🌟 *أهلاً بك في بوت الـ 100 زر!*\n\n"
-        "🔹 اختر أي زر لتحصل على معلومة مميزة\n"
-        "🔹 الأزرار مقسمة على 5 صفحات، كل صفحة 20 زراً\n"
-        "🔹 استخدم أزرار التنقل للتصفح\n\n"
-        "👇 *اختر من القائمة:*"
-    )
+    keyboard = [
+        [InlineKeyboardButton("📂 القائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await update.message.reply_text(
-        welcome_msg,
-        reply_markup=build_main_menu(0),
+        "🌟 *مرحباً بك في البوت المتطور!*\n"
+        "اضغط على الزر أدناه لعرض القائمة الرئيسية.",
+        reply_markup=reply_markup,
         parse_mode="Markdown"
     )
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالج ضغطات الأزرار"""
+# ============ القائمة الرئيسية (12 قسم) ============
+async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    data = query.data
     
-    # زر تجاهل (لعداد الصفحات فقط)
-    if data == "ignore":
-        return
+    keyboard = [
+        [InlineKeyboardButton("🎬 أفلام ومسلسلات", callback_data="menu_movies"),
+         InlineKeyboardButton("🎵 موسيقى وصوتيات", callback_data="menu_music")],
+        [InlineKeyboardButton("📚 كتب ومكتبة", callback_data="menu_books"),
+         InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
+        [InlineKeyboardButton("🛒 متجر", callback_data="menu_shop"),
+         InlineKeyboardButton("💰 خدمات مالية", callback_data="menu_finance")],
+        [InlineKeyboardButton("🌐 أدوات ويب", callback_data="menu_web"),
+         InlineKeyboardButton("📱 تطبيقات", callback_data="menu_apps")],
+        [InlineKeyboardButton("🤖 ذكاء اصطناعي", callback_data="menu_ai"),
+         InlineKeyboardButton("🔐 أمان وحماية", callback_data="menu_security")],
+        [InlineKeyboardButton("📊 إحصائيات", callback_data="menu_stats"),
+         InlineKeyboardButton("⚙️ الإعدادات", callback_data="menu_settings")],
+        [InlineKeyboardButton("🏠 الرجوع للبداية", callback_data="back_to_start")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # التنقل بين الصفحات
-    if data.startswith("page_"):
-        page = int(data.split("_")[1])
-        await query.edit_message_text(
-            "🌟 *اختر زراً لتحصل على معلومة مميزة:*",
-            reply_markup=build_main_menu(page),
-            parse_mode="Markdown"
-        )
-        return
-    
-    # عرض معلومات زر معين
-    if data.startswith("info_"):
-        btn_id = int(data.split("_")[1])
-        btn_data = BUTTONS[btn_id]
-        
-        # إنشاء لوحة أزرار للعودة
-        back_keyboard = [
-            [InlineKeyboardButton("🔙 عودة للقائمة", callback_data="page_0")],
-            [InlineKeyboardButton("🏠 البداية", callback_data="start_over")]
-        ]
-        
-        await query.edit_message_text(
-            f"{btn_data['info']}\n\n---\n🤖 *بوت الـ 100 زر*",
-            reply_markup=InlineKeyboardMarkup(back_keyboard),
-            parse_mode="Markdown"
-        )
-        return
-    
-    # زر العودة للبداية
-    if data == "start_over":
-        await query.edit_message_text(
-            "🌟 *اختر زراً لتحصل على معلومة مميزة:*",
-            reply_markup=build_main_menu(0),
-            parse_mode="Markdown"
-        )
+    await query.edit_message_text(
+        "📋 *القائمة الرئيسية*\nاختر القسم الذي تريده:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
 
+# ============ أزرار الأفلام والمسلسلات ============
+async def menu_movies(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("🎬 أفلام أكشن", callback_data="movies_action"),
+         InlineKeyboardButton("😂 أفلام كوميدية", callback_data="movies_comedy")],
+        [InlineKeyboardButton("😱 أفلام رعب", callback_data="movies_horror"),
+         InlineKeyboardButton("🔮 أفلام خيال علمي", callback_data="movies_scifi")],
+        [InlineKeyboardButton("💕 أفلام رومانسية", callback_data="movies_romance"),
+         InlineKeyboardButton("🎭 أفلام دراما", callback_data="movies_drama")],
+        [InlineKeyboardButton("📺 مسلسلات تركية", callback_data="series_turkish"),
+         InlineKeyboardButton("📺 مسلسلات أجنبية", callback_data="series_foreign")],
+        [InlineKeyboardButton("📺 مسلسلات عربية", callback_data="series_arabic"),
+         InlineKeyboardButton("🎞 مسلسلات كرتون", callback_data="series_cartoon")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "🎬 *قسم الأفلام والمسلسلات*\nاختر التصنيف:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+# ============ أزرار الموسيقى ============
+async def menu_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("🎵 موسيقى هادئة", callback_data="music_calm"),
+         InlineKeyboardButton("🎸 موسيقى روك", callback_data="music_rock")],
+        [InlineKeyboardButton("🎹 موسيقى كلاسيكية", callback_data="music_classic"),
+         InlineKeyboardButton("🎤 أغاني عربية", callback_data="music_arabic")],
+        [InlineKeyboardButton("🎤 أغاني أجنبية", callback_data="music_foreign"),
+         InlineKeyboardButton("🎧 بودكاست", callback_data="music_podcast")],
+        [InlineKeyboardButton("🎼 نغمات", callback_data="music_ringtones"),
+         InlineKeyboardButton("🥁 إيقاعات", callback_data="music_beats")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "🎵 *قسم الموسيقى والصوتيات*\nاختر النوع:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+# ============ أزرار الكتب ============
+async def menu_books(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("📖 روايات", callback_data="books_novels"),
+         InlineKeyboardButton("📚 كتب علمية", callback_data="books_science")],
+        [InlineKeyboardButton("📚 كتب تاريخ", callback_data="books_history"),
+         InlineKeyboardButton("📚 كتب فلسفة", callback_data="books_philosophy")],
+        [InlineKeyboardButton("📚 كتب دينية", callback_data="books_religion"),
+         InlineKeyboardButton("📚 كتب برمجة", callback_data="books_programming")],
+        [InlineKeyboardButton("📚 كتب تطوير ذاتي", callback_data="books_selfdev"),
+         InlineKeyboardButton("📚 كتب طبخ", callback_data="books_cooking")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "📚 *قسم الكتب والمكتبة*\nاختر النوع:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+# ============ أزرار الألعاب ============
+async def menu_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("🎮 ألعاب كمبيوتر", callback_data="games_pc"),
+         InlineKeyboardButton("📱 ألعاب موبايل", callback_data="games_mobile")],
+        [InlineKeyboardButton("🕹 ألعاب بلايستيشن", callback_data="games_ps"),
+         InlineKeyboardButton("🎲 ألعاب جماعية", callback_data="games_multiplayer")],
+        [InlineKeyboardButton("🧩 ألغاز", callback_data="games_puzzles"),
+         InlineKeyboardButton("🏆 بطولات", callback_data="games_tournaments")],
+        [InlineKeyboardButton("🃏 ألعاب ورق", callback_data="games_cards"),
+         InlineKeyboardButton("🎯 ألعاب تصويب", callback_data="games_shooting")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "🎮 *قسم الألعاب*\nاختر النوع:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+# ============ أزرار المتجر ============
+async def menu_shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("👕 ملابس", callback_data="shop_clothes"),
+         InlineKeyboardButton("📱 إلكترونيات", callback_data="shop_electronics")],
+        [InlineKeyboardButton("🏠 أدوات منزلية", callback_data="shop_home"),
+         InlineKeyboardButton("💄 مستحضرات تجميل", callback_data="shop_cosmetics")],
+        [InlineKeyboardButton("🍔 طعام", callback_data="shop_food"),
+         InlineKeyboardButton("🎁 هدايا", callback_data="shop_gifts")],
+        [InlineKeyboardButton("🛒 سلة المشتريات", callback_data="shop_cart"),
+         InlineKeyboardButton("⭐ المفضلة", callback_data="shop_favorites")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "🛒 *قسم المتجر*\nاختر القسم:",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+# ============ باقي الأقسام بنفس النمط ============
+async def menu_finance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("💱 صرف عملات", callback_data="finance_exchange"),
+         InlineKeyboardButton("📈 أسهم", callback_data="finance_stocks")],
+        [InlineKeyboardButton("🏦 بنوك", callback_data="finance_banks"),
+         InlineKeyboardButton("💳 بطاقات", callback_data="finance_cards")],
+        [InlineKeyboardButton("💰 قروض", callback_data="finance_loans"),
+         InlineKeyboardButton("📊 ميزانية", callback_data="finance_budget")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text("💰 *قسم الخدمات المالية*", reply_markup=reply_markup, parse_mode="Markdown")
+
+async def menu_web(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("🔍 بحث", callback_data="web_search"),
+         InlineKeyboardButton("📥 تحميل", callback_data="web_download")],
+        [InlineKeyboardButton("🖼 صور", callback_data="web_images"),
+         InlineKeyboardButton("📹 فيديو", callback_data="web_video")],
+        [InlineKeyboardButton("🌍 ترجمة", callback_data="web_translate"),
+         InlineKeyboardButton("📝 نصوص", callback_data="web_text")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text("🌐 *قسم أدوات الويب*", reply_markup=reply_markup, parse_mode="Markdown")
+
+async def menu_apps(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("📱 أندرويد", callback_data="apps_android"),
+         InlineKeyboardButton("🍎 آيفون", callback_data="apps_ios")],
+        [InlineKeyboardButton("💻 ويندوز", callback_data="apps_windows"),
+         InlineKeyboardButton("🐧 لينكس", callback_data="apps_linux")],
+        [InlineKeyboardButton("🔧 أدوات", callback_data="apps_tools"),
+         InlineKeyboardButton("🎨 تصميم", callback_data="apps_design")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text("📱 *قسم التطبيقات*", reply_markup=reply_markup, parse_mode="Markdown")
+
+async def menu_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("💬 شات", callback_data="ai_chat"),
+         InlineKeyboardButton("🖼 توليد صور", callback_data="ai_images")],
+        [InlineKeyboardButton("🎵 توليد موسيقى", callback_data="ai_music_gen"),
+         InlineKeyboardButton("📝 كتابة نصوص", callback_data="ai_text")],
+        [InlineKeyboardButton("🗣 تحويل صوت لنص", callback_data="ai_speech"),
+         InlineKeyboardButton("🎥 فيديو", callback_data="ai_video")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text("🤖 *قسم الذكاء الاصطناعي*", reply_markup=reply_markup, parse_mode="Markdown")
+
+async def menu_security(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("🔑 كلمات سر", callback_data="security_passwords"),
+         InlineKeyboardButton("🛡 VPN", callback_data="security_vpn")],
+        [InlineKeyboardButton("🔒 تشفير", callback_data="security_encrypt"),
+         InlineKeyboardButton("🕵️ فحص روابط", callback_data="security_scan")],
+        [InlineKeyboardButton("📧 بريد مؤقت", callback_data="security_temp_mail"),
+         InlineKeyboardButton("📱 أرقام وهمية", callback_data="security_fake_number")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text("🔐 *قسم الأمان والحماية*", reply_markup=reply_markup, parse_mode="Markdown")
+
+async def menu_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("👥 المستخدمين", callback_data="stats_users"),
+         InlineKeyboardButton("📊 النشاط", callback_data="stats_activity")],
+        [InlineKeyboardButton("⭐ تقييمات", callback_data="stats_ratings"),
+         InlineKeyboardButton("📈 نمو", callback_data="stats_growth")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text("📊 *قسم الإحصائيات*", reply_markup=reply_markup, parse_mode="Markdown")
+
+async def menu_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("🌍 اللغة", callback_data="settings_language"),
+         InlineKeyboardButton("🔔 الإشعارات", callback_data="settings_notifications")],
+        [InlineKeyboardButton("🎨 المظهر", callback_data="settings_theme"),
+         InlineKeyboardButton("👤 الحساب", callback_data="settings_account")],
+        [InlineKeyboardButton("ℹ️ عن البوت", callback_data="settings_about"),
+         InlineKeyboardButton("📞 تواصل", callback_data="settings_contact")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text("⚙️ *قسم الإعدادات*", reply_markup=reply_markup, parse_mode="Markdown")
+
+# ============ دوال الأزرار الفردية (تعمل بشكل مستقل) ============
+async def movies_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "🎬 *أفلام الأكشن*\n\n"
+        "هنا تجد أفضل أفلام الأكشن:\n"
+        "• Fast & Furious\n• John Wick\n• Mission Impossible\n• The Dark Knight\n\n"
+        "اختر فيلماً للمزيد من التفاصيل.",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 رجوع", callback_data="menu_movies")
+        ]])
+    )
+
+async def movies_comedy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "😂 *أفلام كوميدية*\n\n"
+        "اضحك مع أفضل الأفلام الكوميدية:\n"
+        "• The Hangover\n• Superbad\n• Deadpool\n• Home Alone",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 رجوع", callback_data="menu_movies")
+        ]])
+    )
+
+async def movies_horror(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "😱 *أفلام الرعب*\n\n"
+        "للعشاق الرعب فقط:\n"
+        "• The Conjuring\n• IT\n• A Quiet Place\n• Get Out",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 رجوع", callback_data="menu_movies")
+        ]])
+    )
+
+async def movies_scifi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "🔮 *أفلام الخيال العلمي*\n\n"
+        "استكشف عوالم المستقبل:\n"
+        "• Interstellar\n• Inception\n• The Matrix\n• Avatar",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 رجوع", callback_data="menu_movies")
+        ]])
+    )
+
+# ============ دوال إضافية لباقي الأزرار ============
+async def movies_romance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("💕 *أفلام رومانسية*\nThe Notebook, Titanic, La La Land...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_movies")]]))
+
+async def movies_drama(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎭 *أفلام دراما*\nThe Shawshank Redemption, Forrest Gump...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_movies")]]))
+
+async def series_turkish(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📺 *مسلسلات تركية*\nقيامة أرطغرل, نهضة السلاجقة...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_movies")]]))
+
+async def series_foreign(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📺 *مسلسلات أجنبية*\nBreaking Bad, Game of Thrones...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_movies")]]))
+
+async def series_arabic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📺 *مسلسلات عربية*\nالهيبة, باب الحارة...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_movies")]]))
+
+async def series_cartoon(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎞 *مسلسلات كرتون*\nSpongeBob, Rick and Morty...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_movies")]]))
+
+# دوال الموسيقى
+async def music_calm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎵 *موسيقى هادئة للاسترخاء*", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_music")]]))
+
+async def music_rock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎸 *موسيقى الروك*\nQueen, AC/DC, Metallica...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_music")]]))
+
+async def music_classic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎹 *موسيقى كلاسيكية*\nBeethoven, Mozart, Chopin...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_music")]]))
+
+async def music_arabic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎤 *أغاني عربية*\nأم كلثوم, فيروز, كاظم الساهر...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_music")]]))
+
+async def music_foreign(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎤 *أغاني أجنبية*\nEd Sheeran, Adele, Taylor Swift...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_music")]]))
+
+async def music_podcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎧 *بودكاست*\nبرامج صوتية ممتعة ومفيدة", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_music")]]))
+
+async def music_ringtones(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎼 *نغمات جوال*\nأفضل النغمات لهاتفك", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_music")]]))
+
+async def music_beats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🥁 *إيقاعات*\nللإنتاج الموسيقي", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_music")]]))
+
+# دوال الكتب
+async def books_novels(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📖 *روايات*\nأجمل الروايات العربية والعالمية", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_books")]]))
+
+async def books_science(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📚 *كتب علمية*\nفيزياء، كيمياء، أحياء...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_books")]]))
+
+async def books_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📚 *كتب تاريخ*\nتاريخ الحضارات والأمم", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_books")]]))
+
+async def books_philosophy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📚 *كتب فلسفة*\nلأعظم الفلاسفة", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_books")]]))
+
+async def books_religion(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📚 *كتب دينية*\nتفاسير، فقه، سيرة...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_books")]]))
+
+async def books_programming(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📚 *كتب برمجة*\nPython, JavaScript, AI...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_books")]]))
+
+async def books_selfdev(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📚 *تطوير الذات*\nالعادات السبع، فكر تصبح غنياً...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_books")]]))
+
+async def books_cooking(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📚 *كتب طبخ*\nأشهى الوصفات العالمية", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_books")]]))
+
+# دوال الألعاب
+async def games_pc(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎮 *ألعاب الكمبيوتر*\nأفضل ألعاب PC", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games")]]))
+
+async def games_mobile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("📱 *ألعاب الموبايل*\nPUBG, Free Fire, Clash...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games")]]))
+
+async def games_ps(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🕹 *ألعاب بلايستيشن*\nGod of War, Spider-Man...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games")]]))
+
+async def games_multiplayer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎲 *ألعاب جماعية*\nالعب مع أصدقائك", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games")]]))
+
+async def games_puzzles(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🧩 *ألغاز*\nاختبر ذكاءك", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games")]]))
+
+async def games_tournaments(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🏆 *بطولات*\nشارك في البطولات", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games")]]))
+
+async def games_cards(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🃏 *ألعاب الورق*\nبوكر، طرنيب، بلوت...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games")]]))
+
+async def games_shooting(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text("🎯 *ألعاب التصويب*\nCall of Duty, Valorant...", parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games")]]))
+
+# ============ الرجوع للبداية ============
+async def back_to_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("📂 القائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        "🌟 *مرحباً بك في البوت المتطور!*\nاضغط على الزر أدناه لعرض القائمة الرئيسية.",
+        reply_markup=reply_markup,
+        parse_mode="Markdown"
+    )
+
+# ============ الدالة الرئيسية ============
 def main():
-    """الدالة الرئيسية لتشغيل البوت"""
-    # ضع توكن البوت الخاص بك هنا
-    TOKEN = "8635193672:AAE3DJlsOuTPJhviBugWdrJ1vTVO7l_kF6U"
-    
     # إنشاء التطبيق
-    app = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).build()
     
-    # إضافة المعالجات
+    # إضافة معالجات الأوامر
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler))
     
-    # تشغيل البوت
-    print("✅ البوت يعمل الآن...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
-
-if __name__ == "__main__":
-    main()
+    # معالجات القوائم الرئيسية
+    app.add_handler(CallbackQueryHandler(main_menu, pattern="^main_menu$"))
+    app.add_handler(CallbackQueryHandler(menu_movies, pattern="^menu_movies$"))
+    app.add_handler(CallbackQueryHandler(menu_music, pattern="^menu_music$"))
+    app.add_handler(CallbackQueryHandler(menu_books, pattern="^menu_books$"))
+    app.add_handler(CallbackQueryHandler(menu_games, pattern="^menu_games$"))
+    app.add_handler(CallbackQueryHandler(menu_shop, pattern="^menu_shop$"))
+    app.add_handler(CallbackQueryHandler(menu_finance, pattern="^menu_finance$"))
+    app.add_handler(CallbackQueryHandler(menu_web, pattern="^menu_web$"))
+    app.add_handler(CallbackQueryHandler(menu_apps, pattern="^menu_apps$"))
+    app.add_handler(CallbackQueryHandler(menu_ai, pattern="^menu_ai$"))
+    app.add_handler(CallbackQueryHandler(menu_security, pattern="^menu_security$"))
+    app.add_handler(CallbackQueryHandler(menu_stats, pattern="^menu_stats$"))
+    app.add_handler(CallbackQueryHandler(menu_settings, pattern="^menu_settings$"))
+    
+    # معالجات الأزرار الفردية - أفلام
+    app.add_handler(CallbackQueryHandler(movies_action, pattern="^movies_action$"))
+    app.add_handler(CallbackQueryHandler(movies_comedy, pattern="^movies_comedy$"))
+    app.add_handler(CallbackQueryHandler(movies_horror, pattern="^movies_horror$"))
+    app.add_handler(CallbackQueryHandler(movies_scifi, pattern="^movies_scifi$"))
+    app.add_handler(CallbackQueryHandler(movies_romance, pattern="^movies_romance$"))
+    app.add_handler(CallbackQueryHandler(movies_drama, pattern="^movies_drama$"))
+    app.add_handler(CallbackQueryHandler(series_turkish, pattern="^series_turkish$"))
+    app.add_handler(CallbackQueryHandler(series_foreign, pattern="^series_foreign$"))
+    app.add_handler(CallbackQueryHandler(series_arabic, pattern="^series_arabic$"))
+    app.add_handler(CallbackQueryHandler(series_cartoon, pattern="^series_cartoon$"))
+    
+    # معالجات الأزرار الفردية - موسيقى
+    app.add_handler(CallbackQueryHandler(music_calm, pattern="^music_calm$"))
+    app.add_handler(CallbackQueryHandler(music_rock, pattern="^music_rock$"))
+    app.add_handler(CallbackQueryHandler(music_classic, pattern="^music_classic$"))
+    app.add_handler(CallbackQueryHandler(music_arabic, pattern="^music_arabic$"))
+    app.add_handler(CallbackQueryHandler(music_foreign, pattern="^music_foreign$"))
+    app.add_handler(CallbackQueryHandler(music_podcast, pattern="^music_podcast$"))
+    app.add_handler(CallbackQueryHandler(music_ringtones, pattern="^music_ringtones$"))
+    app.add_handler(CallbackQueryHandler(music_beats, pattern="^music_beats$"))
+    
+    # معالجات
