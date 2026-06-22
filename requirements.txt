@@ -4,3 +4,5 @@ python-telegram-bot
 pyrogram
 tgcrypto
 telethon
+ping3
+speedtest
