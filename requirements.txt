@@ -6,3 +6,4 @@ tgcrypto
 telethon
 ping3
 speedtest
+psutil
