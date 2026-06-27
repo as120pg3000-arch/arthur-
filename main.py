@@ -21,8 +21,8 @@ except ImportError:
     print("❌ Telethon غير مثبت! قم بتثبيته: pip install telethon")
 
 # ==================== مفاتيح API مضمّنة مباشرة ====================
-API_ID = 34418359
-API_HASH = "ffc2e6b7fc449832be0e4c9d2cf7e467"
+API_ID = 39128959
+API_HASH = "bc2d60133b24b74760f84674b91e69a4"
 
 # ========== معلومات البوت ==========
 TOKEN = "8857111456:AAEOykI2prHGF2QKlBacXNYdB-LiqKF5ih4"
