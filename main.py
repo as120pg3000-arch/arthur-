@@ -1,7 +1,6 @@
 # ============================================================
-# بوت الإبلاغ الآلي - النسخة النهائية المتكاملة (Telethon فقط)
+# بوت الإبلاغ الآلي - النسخة النهائية (حل مشكلة event loop)
 # API_ID = 39128959 , API_HASH = bc2d60133b24b74760f84674b91e69a4
-# حل مشكلة Event loop is closed + أسماء عشوائية + جميع الأزرار
 # ============================================================
 
 import telebot
@@ -22,7 +21,7 @@ except ImportError:
     TELETHON_AVAILABLE = False
     print("❌ Telethon غير مثبت! قم بتثبيته: pip install telethon")
 
-# ==================== مفاتيح API الجديدة ====================
+# ==================== مفاتيح API ====================
 API_ID = 39128959
 API_HASH = "bc2d60133b24b74760f84674b91e69a4"
 
@@ -44,7 +43,8 @@ report_stats = {
     "current_message": None
 }
 
-active_clients = {}  # لحل phone_code_hash
+# لتخزين phone_code_hash مؤقتاً لكل مستخدم
+temp_data = {}
 
 # ========== دوال المساعدة ==========
 def load_json(file):
@@ -136,7 +136,7 @@ def get_session(phone):
 
 # ========== دالة async آمنة ==========
 def run_async(coro):
-    """تشغيل coroutine باستخدام asyncio.run() مع إعادة محاولة عند خطأ الحلقة"""
+    """تشغيل coroutine في حلقة جديدة آمنة"""
     try:
         return asyncio.run(coro)
     except RuntimeError as e:
@@ -191,7 +191,7 @@ def start(msg):
         return
     main_menu(msg.chat.id, msg.from_user.id)
 
-# ========== لوحة المالك ==========
+# ========== لوحة المالك (مختصرة) ==========
 @bot.message_handler(commands=['admin'])
 def admin_panel(msg):
     if not is_owner(msg.from_user.id):
@@ -223,7 +223,7 @@ def admin_panel(msg):
     safe_send_message(msg.chat.id, f"🔐 **لوحة تحكم المالك**\n📊 حالة البوت: {status_text}", reply_markup=keyboard, parse_mode="Markdown")
 
 # ====================================================================================
-# دوال إدارة المستخدمين والأدمن (للمالك فقط) - مختصرة
+# دوال إدارة المستخدمين (للمالك) - مختصرة
 # ====================================================================================
 @bot.callback_query_handler(func=lambda call: call.data == "admin_users")
 def admin_show_users(call):
@@ -361,7 +361,7 @@ def admin_close_bot(call):
     admin_panel(call.message)
 
 # ====================================================================================
-# دوال إضافة حساب (Telethon مع حل phone_code_hash و Event loop)
+# دوال إضافة حساب (Telethon مع حل نهائي لمشكلة event loop)
 # ====================================================================================
 @bot.callback_query_handler(func=lambda call: call.data == "add_account")
 def add_account(call):
@@ -379,25 +379,25 @@ def get_phone(msg):
     chat_id = msg.chat.id
     safe_send_message(chat_id, "⏳ جاري إرسال كود التحقق...")
 
-    client = TelegramClient(f'temp_{phone.replace("+", "")}', API_ID, API_HASH)
-    active_clients[chat_id] = {"client": client, "phone": phone}
-
     def process():
         try:
-            # استخدام run_async بدلاً من إنشاء loop يدوي
+            # إنشاء عميل مؤقت لإرسال الكود واستخراج phone_code_hash
+            client = TelegramClient(f'temp_{phone.replace("+", "")}', API_ID, API_HASH)
             async def send_code():
                 await client.connect()
-                await client.send_code_request(phone)
-            run_async(send_code())
+                sent = await client.send_code_request(phone)
+                await client.disconnect()
+                return sent.phone_code_hash
+            phone_code_hash = run_async(send_code())
+            # تخزين phone_code_hash مؤقتاً
+            temp_data[chat_id] = {"phone": phone, "code_hash": phone_code_hash}
             safe_send_message(chat_id, "🔑 **تم إرسال كود التحقق**\nأرسل الكود الآن:", parse_mode="Markdown")
             bot.register_next_step_handler(msg, get_code)
         except tel_errors.FloodWaitError as e:
             minutes, seconds = divmod(e.seconds, 60)
             safe_send_message(chat_id, f"⛔ **تم حظر إرسال الكود مؤقتاً!**\n⏳ انتظر {minutes} دقيقة و {seconds} ثانية.\n🔄 أو غيّر API_ID و API_HASH لحل فوري.", parse_mode="Markdown")
-            active_clients.pop(chat_id, None)
         except Exception as e:
             safe_send_message(chat_id, f"❌ **فشل إرسال الكود:**\n{str(e)[:200]}", parse_mode="Markdown")
-            active_clients.pop(chat_id, None)
 
     threading.Thread(target=process).start()
 
@@ -405,20 +405,23 @@ def get_code(msg):
     code = msg.text.strip()
     chat_id = msg.chat.id
     user_id = msg.from_user.id
-    data = active_clients.get(chat_id)
+    data = temp_data.get(chat_id)
     if not data:
         safe_send_message(chat_id, "❌ انتهت الجلسة، استخدم /start لإعادة المحاولة.", parse_mode="Markdown")
         return
 
-    client = data["client"]
     phone = data["phone"]
+    code_hash = data["code_hash"]
     safe_send_message(chat_id, "⏳ جاري تسجيل الدخول...")
 
     def process():
         try:
+            # إنشاء عميل جديد باستخدام phone_code_hash المخزن
+            client = TelegramClient(f'temp_{phone.replace("+", "")}', API_ID, API_HASH)
             async def login():
+                await client.connect()
                 try:
-                    await client.sign_in(phone, code)
+                    await client.sign_in(phone, code, phone_code_hash=code_hash)
                     me = await client.get_me()
                     session_str = client.session.save()
                     await client.disconnect()
@@ -426,9 +429,6 @@ def get_code(msg):
                 except tel_errors.SessionPasswordNeededError:
                     await client.disconnect()
                     return None, None, "password_needed"
-                except Exception as e:
-                    await client.disconnect()
-                    raise e
             me, session_str, status = run_async(login())
 
             if status == "password_needed":
@@ -436,6 +436,7 @@ def get_code(msg):
                 bot.register_next_step_handler(msg, get_2fa)
                 return
 
+            # نجاح الدخول
             random_name = generate_random_name(10)
             save_session(phone, session_str, me.first_name, None)
             user_accounts = get_user_accounts(user_id)
@@ -486,7 +487,7 @@ def get_code(msg):
         except Exception as e:
             safe_send_message(chat_id, f"❌ **فشل تسجيل الدخول:**\n{str(e)[:200]}", parse_mode="Markdown")
         finally:
-            active_clients.pop(chat_id, None)
+            temp_data.pop(chat_id, None)
 
     threading.Thread(target=process).start()
 
@@ -494,24 +495,25 @@ def get_2fa(msg):
     twofa = msg.text.strip()
     chat_id = msg.chat.id
     user_id = msg.from_user.id
-    data = active_clients.get(chat_id)
+    data = temp_data.get(chat_id)
     if not data:
         safe_send_message(chat_id, "❌ انتهت الجلسة، استخدم /start.", parse_mode="Markdown")
         return
 
-    client = data["client"]
     phone = data["phone"]
+    code_hash = data["code_hash"]
     if twofa.lower() == "لا":
         twofa = None
 
     def process():
         try:
+            client = TelegramClient(f'temp_{phone.replace("+", "")}', API_ID, API_HASH)
             async def login():
                 await client.connect()
+                # نستخدم sign_in مع phone_code_hash
+                await client.sign_in(phone, None, phone_code_hash=code_hash)
                 if twofa:
                     await client.sign_in(password=twofa)
-                else:
-                    await client.sign_in(password="")
                 me = await client.get_me()
                 session_str = client.session.save()
                 await client.disconnect()
@@ -568,7 +570,7 @@ def get_2fa(msg):
         except Exception as e:
             safe_send_message(chat_id, f"❌ **فشل تسجيل الدخول:**\n{str(e)[:200]}", parse_mode="Markdown")
         finally:
-            active_clients.pop(chat_id, None)
+            temp_data.pop(chat_id, None)
 
     threading.Thread(target=process).start()
 
@@ -652,7 +654,7 @@ def save_session_step(msg):
     threading.Thread(target=process).start()
 
 # ====================================================================================
-# عرض الحسابات وتفاصيلها
+# باقي الدوال (عرض الحسابات، الإعدادات، الإبلاغ، إلخ) - مختصرة ولكن تعمل
 # ====================================================================================
 @bot.callback_query_handler(func=lambda call: call.data == "show_accounts")
 def show_accounts(call):
@@ -754,14 +756,10 @@ def refresh_account(call):
         return
     acc = accounts[index]
     phone = acc.get('phone', '')
-    safe_send_message(call.message.chat.id, f"🔄 **جاري إرسال كود جديد إلى {phone}**")
-    # يمكنك إضافة منطق إعادة إرسال الكود هنا (مشابه لـ get_phone لكن مع تحديث السيشن)
-    # سنكتفي برسالة توضيحية
-    safe_send_message(call.message.chat.id, "📨 **تم إرسال كود جديد** (وظيفة قيد التطوير)", parse_mode="Markdown")
+    # إرسال كود جديد (يمكننا إعادة استخدام get_phone مع تحديث السيشن)
+    safe_send_message(call.message.chat.id, f"🔄 **جاري إرسال كود جديد إلى {phone}** (وظيفة قيد التطوير)")
+    # لتنفيذها بالكامل، يمكن استدعاء get_phone من جديد مع تحديث السيشن.
 
-# ====================================================================================
-# الرسائل والإعدادات ونوع البلاغ والإبلاغ (مختصرة ولكن تعمل)
-# ====================================================================================
 @bot.callback_query_handler(func=lambda call: call.data == "show_messages")
 def show_messages(call):
     messages = get_messages()
@@ -940,9 +938,25 @@ def run_reporting(chat_id, user_id):
                                 reason=reason,
                                 message=comment
                             ))
-                            # تحديث الإحصائيات...
+                            # تحديث الإحصائيات
+                            accounts = get_user_accounts(user_id)
+                            for a in accounts:
+                                if a.get('phone') == acc.get('phone'):
+                                    a['reports_count'] = a.get('reports_count', 0) + 1
+                                    a['success_reports'] = a.get('success_reports', 0) + 1
+                                    a['last_used'] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                                    save_user_accounts(user_id, accounts)
+                                    break
                             safe_send_message(chat_id, f"✅ بلاغ نجح: {msg.get('link')}")
                         except Exception as e:
+                            # تحديث الفشل
+                            accounts = get_user_accounts(user_id)
+                            for a in accounts:
+                                if a.get('phone') == acc.get('phone'):
+                                    a['reports_count'] = a.get('reports_count', 0) + 1
+                                    a['failed_reports'] = a.get('failed_reports', 0) + 1
+                                    save_user_accounts(user_id, accounts)
+                                    break
                             safe_send_message(chat_id, f"❌ خطأ: {str(e)[:100]}")
                         time.sleep(sleep_time)
                 await client.disconnect()
