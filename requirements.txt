@@ -1,5 +1,5 @@
 pyTelegramBotAPI
-python-telegram-bot
+python-telegram-bot==21.3
 pyrogram
 tgcrypto
 telethon
