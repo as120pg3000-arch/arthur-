@@ -8,3 +8,4 @@ ping3
 speedtest
 psutil
 yt_dlp
+Updater
