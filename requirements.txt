@@ -6,4 +6,4 @@ ping3
 speedtest-cli
 psutil
 yt_dlp
-
+telegram
