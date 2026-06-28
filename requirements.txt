@@ -1,9 +1,9 @@
-pyTelegramBotAPI
-python-telegram-bot==21.3
+pyTelegramBotAPI==4.26.0
 pyrogram
 tgcrypto
 telethon
 ping3
-speedtest
+speedtest-cli
 psutil
 yt_dlp
+
