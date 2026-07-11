@@ -6,3 +6,6 @@ ping3
 speedtest-cli
 psutil
 yt_dlp
+transformers>=4.30.0
+torch>=2.0.0
+pillow>=10.0.0
